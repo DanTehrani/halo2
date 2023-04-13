@@ -17,14 +17,14 @@ use crate::arithmetic::{adc, mac, macx, sbb};
 ///
 /// is the base field of the secp256k1 curve.
 // The internal representation of this type is four 64-bit unsigned
-// integers in little-endian order. `Fp` values are always in
-// Montgomery form; i.e., Fp(a) = aR mod p, with R = 2^256.
+// integers in little-endian order. `Fq` values are always in
+// Montgomery form; i.e., Fq(a) = aR mod p, with R = 2^256.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct Fp(pub(crate) [u64; 4]);
+pub struct Fq(pub(crate) [u64; 4]);
 
 /// Constant representing the modulus
 /// p = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f
-const MODULUS: Fp = Fp([
+const MODULUS: Fq = Fq([
     0xfffffffefffffc2f,
     0xffffffffffffffff,
     0xffffffffffffffff,
@@ -52,37 +52,37 @@ const INV: u64 = 0xd838091dd2253531;
 
 /// R = 2^256 mod p
 /// 0x1000003d1
-const R: Fp = Fp([0x1000003d1, 0, 0, 0]);
+const R: Fq = Fq([0x1000003d1, 0, 0, 0]);
 
 /// R^2 = 2^512 mod p
 /// 0x1000007a2000e90a1
-const R2: Fp = Fp([0x000007a2000e90a1, 0x1, 0, 0]);
+const R2: Fq = Fq([0x000007a2000e90a1, 0x1, 0, 0]);
 
 /// R^3 = 2^768 mod p
 /// 0x100000b73002bb1e33795f671
-const R3: Fp = Fp([0x002bb1e33795f671, 0x100000b73, 0, 0]);
+const R3: Fq = Fq([0x002bb1e33795f671, 0x100000b73, 0, 0]);
 
 /// 1 / 2 mod p
-const TWO_INV: Fp = Fp::from_raw([
+const TWO_INV: Fq = Fq::from_raw([
     0xffffffff7ffffe18,
     0xffffffffffffffff,
     0xffffffffffffffff,
     0x7fffffffffffffff,
 ]);
 
-const ZETA: Fp = Fp::zero();
-const DELTA: Fp = Fp::zero();
-const ROOT_OF_UNITY_INV: Fp = Fp::zero();
+const ZETA: Fq = Fq::zero();
+const DELTA: Fq = Fq::zero();
+const ROOT_OF_UNITY_INV: Fq = Fq::zero();
 
 use crate::{
     field_arithmetic, field_common, field_specific, impl_add_binop_specify_output,
     impl_binops_additive, impl_binops_additive_specify_output, impl_binops_multiplicative,
     impl_binops_multiplicative_mixed, impl_sub_binop_specify_output,
 };
-impl_binops_additive!(Fp, Fp);
-impl_binops_multiplicative!(Fp, Fp);
+impl_binops_additive!(Fq, Fq);
+impl_binops_multiplicative!(Fq, Fq);
 field_common!(
-    Fp,
+    Fq,
     MODULUS,
     INV,
     MODULUS_STR,
@@ -94,15 +94,15 @@ field_common!(
     R2,
     R3
 );
-field_arithmetic!(Fp, MODULUS, INV, dense);
+field_arithmetic!(Fq, MODULUS, INV, dense);
 
-impl Fp {
+impl Fq {
     pub const fn size() -> usize {
         32
     }
 }
 
-impl ff::Field for Fp {
+impl ff::Field for Fq {
     fn random(mut rng: impl RngCore) -> Self {
         Self::from_u512([
             rng.next_u64(),
@@ -177,7 +177,7 @@ impl ff::Field for Fp {
     }
 }
 
-impl ff::PrimeField for Fp {
+impl ff::PrimeField for Fq {
     type Repr = [u8; 32];
 
     const NUM_BITS: u32 = 256;
@@ -185,7 +185,7 @@ impl ff::PrimeField for Fp {
     const S: u32 = 1;
 
     fn from_repr(repr: Self::Repr) -> CtOption<Self> {
-        let mut tmp = Fp([0, 0, 0, 0]);
+        let mut tmp = Fq([0, 0, 0, 0]);
 
         tmp.0[0] = u64::from_le_bytes(repr[0..8].try_into().unwrap());
         tmp.0[1] = u64::from_le_bytes(repr[8..16].try_into().unwrap());
@@ -213,7 +213,7 @@ impl ff::PrimeField for Fp {
     fn to_repr(&self) -> Self::Repr {
         // Turn into canonical form by computing
         // (a.R) / R = a
-        let tmp = Fp::montgomery_reduce_short(self.0[0], self.0[1], self.0[2], self.0[3]);
+        let tmp = Fq::montgomery_reduce_short(self.0[0], self.0[1], self.0[2], self.0[3]);
 
         let mut res = [0; 32];
         res[0..8].copy_from_slice(&tmp.0[0].to_le_bytes());
@@ -237,11 +237,11 @@ impl ff::PrimeField for Fp {
     }
 }
 
-impl SqrtRatio for Fp {
+impl SqrtRatio for Fq {
     const T_MINUS1_OVER2: [u64; 4] = [0, 0, 0, 0];
 
     fn get_lower_32(&self) -> u32 {
-        let tmp = Fp::montgomery_reduce_short(self.0[0], self.0[1], self.0[2], self.0[3]);
+        let tmp = Fq::montgomery_reduce_short(self.0[0], self.0[1], self.0[2], self.0[3]);
         tmp.0[0] as u32
     }
 }
@@ -255,11 +255,11 @@ mod test {
     #[test]
     fn test_sqrt() {
         // NB: TWO_INV is standing in as a "random" field element
-        let v = (Fp::TWO_INV).square().sqrt().unwrap();
-        assert!(v == Fp::TWO_INV || (-v) == Fp::TWO_INV);
+        let v = (Fq::TWO_INV).square().sqrt().unwrap();
+        assert!(v == Fq::TWO_INV || (-v) == Fq::TWO_INV);
 
         for _ in 0..10000 {
-            let a = Fp::random(OsRng);
+            let a = Fq::random(OsRng);
             let mut b = a;
             b = b.square();
 
@@ -273,11 +273,11 @@ mod test {
 
     #[test]
     fn test_field() {
-        crate::tests::field::random_field_tests::<Fp>("secp256k1 base".to_string());
+        crate::tests::field::random_field_tests::<Fq>("secp256k1 base".to_string());
     }
 
     #[test]
     fn test_serialization() {
-        crate::tests::field::random_serialization_test::<Fp>("secp256k1 base".to_string());
+        crate::tests::field::random_serialization_test::<Fq>("secp256k1 base".to_string());
     }
 }
