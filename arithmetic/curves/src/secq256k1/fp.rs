@@ -2,7 +2,7 @@ use core::convert::TryInto;
 use core::fmt;
 use core::ops::{Add, Mul, Neg, Sub};
 
-use ff::PrimeField;
+use ff::{PrimeField, PrimeFieldBits};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
@@ -273,6 +273,20 @@ impl SqrtRatio for Fp {
     fn get_lower_32(&self) -> u32 {
         let tmp = Fp::montgomery_reduce_short(self.0[0], self.0[1], self.0[2], self.0[3]);
         tmp.0[0] as u32
+    }
+}
+
+impl PrimeFieldBits for Fp {
+    type ReprBits = [u8; 32];
+
+    fn to_le_bits(&self) -> ff::FieldBits<Self::ReprBits> {
+        self.to_bytes().into()
+    }
+
+    fn char_le_bits() -> ff::FieldBits<Self::ReprBits> {
+        let mut bytes = MODULUS.to_bytes();
+        bytes.reverse();
+        bytes.into()
     }
 }
 
